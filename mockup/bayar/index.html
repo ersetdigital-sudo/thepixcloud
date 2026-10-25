@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pembayaran · thepixcloud</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/app.js"></script>
+<style>
+.pm{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:16px;border:1.5px solid var(--line);background:#fff;min-height:60px;transition:.15s}
+.pm .ib{width:38px;height:38px;border-radius:12px;background:var(--soft);color:var(--red);display:grid;place-items:center;flex:none}
+.pm.on{border-color:var(--red);background:#FFFCE0;box-shadow:4px 4px 0 var(--soft)}
+.pm .rd{margin-left:auto;width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none}
+.pm.on .rd{border:6px solid var(--red)}
+</style>
+</head>
+<body class="no-foot-m">
+<header id="hdr"></header>
+<main class="pb-bar" id="main">
+  <section class="wrap" style="padding-top:28px">
+    <a href="javascript:history.back()" class="mute" style="font-size:14px;font-weight:600">← Kembali</a>
+    <h1 style="font-size:clamp(32px,6vw,52px);font-weight:900;margin-top:8px;line-height:1">Pembayaran</h1>
+  </section>
+  <section class="wrap grid lg:grid-cols-[1fr_380px] gap-6 items-start" style="margin-top:24px" id="body"></section>
+</main>
+<div class="fbar" id="fbar" style="display:none">
+  <div style="flex:1;min-width:0"><div style="font-size:12px;opacity:.7" id="fpm">Pilih metode bayar</div><div class="fh" id="ftot" style="font-weight:800;font-size:18px">Rp0</div></div>
+  <button class="btn btn-red" id="fgo" disabled>Bayar</button>
+</div>
+<div id="ftr"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const {P,items,bill,PAY,PROMO,rp,icon,qs,saveOrder}=CZ;
+  const $=id=>document.getElementById(id);
+  const s=qs('s'),pv=qs('p'),i=+qs('i'),n=qs('n');
+  const p=P[s]; let it=null;
+  if(p&&pv&&n&&!isNaN(i)){ it=p.bill?bill(s,pv,n):items(s,pv)[i]; }
+  if(!it){
+    $('body').className='wrap';
+    $('body').innerHTML=`<div class="card card-pop" style="padding:40px 24px;text-align:center;max-width:520px;margin:0 auto">
+      <span style="width:64px;height:64px;border-radius:18px;background:#FFFCB0;color:#E43E00;display:inline-grid;place-items:center">${icon('receipt','ic" style="width:30px;height:30px')}</span>
+      <h2 style="font-size:28px;font-weight:900;margin-top:16px">Belum ada pesanan</h2><p class="mute" style="margin-top:8px">Pilih produk dulu, nanti ringkasannya muncul di sini.</p>
+      <a href="/produk?s=pulsa" class="btn btn-red" style="margin-top:20px">Pilih produk</a></div>`;
+    document.body.classList.remove('no-foot-m');document.querySelector('main').classList.remove('pb-bar');return;
+  }
+  $('fbar').style.display='';
+  const st={pm:null,promo:false};
+  const grps=[...new Set(PAY.map(x=>x.grp))];
+  $('body').innerHTML=`<div class="space-y-4">
+    <div class="card" style="padding:22px"><h3 style="font-size:19px;font-weight:800">Metode pembayaran</h3>
+      ${grps.map(g=>`<div style="margin-top:16px"><div class="lbl">${g}</div><div class="grid sm:grid-cols-2 gap-2.5">${PAY.filter(x=>x.grp===g).map(x=>`<button class="pm" data-id="${x.id}"><span class="ib">${icon(x.icon)}</span><span><b style="font-size:14.5px;display:block">${x.name}</b><span class="mute" style="font-size:12.5px">${x.fee?'+'+rp(x.fee):'Gratis biaya'}</span></span><span class="rd"></span></button>`).join('')}</div></div>`).join('')}
+    </div>
+    <div class="card" style="padding:22px"><h3 style="font-size:19px;font-weight:800">Kode promo</h3>
+      <div class="flex gap-2" style="margin-top:12px"><input id="promo" class="inp" placeholder="Contoh: PIXCLOUD5" style="text-transform:uppercase"><button class="btn btn-ghost" id="ap" style="min-height:52px;flex:none">Pakai</button></div>
+      <p id="pmsg" style="font-size:13px;margin-top:8px" class="mute">Diskon 5% (maks Rp5.000) pakai PIXCLOUD5.</p></div>
+    <div class="card" style="padding:22px"><h3 style="font-size:19px;font-weight:800">Email <span class="mute" style="font-weight:500;font-size:14px">(opsional)</span></h3>
+      <input id="em" class="inp" type="email" placeholder="kamu@email.com" style="margin-top:12px"><p class="mute" style="font-size:13px;margin-top:8px">Bukti transaksi dikirim ke sini.</p></div>
+  </div>
+  <aside class="card card-pop" style="padding:24px;position:sticky;top:90px">
+    <h3 style="font-size:20px;font-weight:800">Ringkasan pesanan</h3>
+    <div class="flex gap-3 items-center" style="margin-top:16px;padding:12px;border-radius:14px;background:#F0EEDA"><span style="width:44px;height:44px;border-radius:12px;background:#E43E00;color:#F0EEDA;display:grid;place-items:center;flex:none">${icon(p.icon)}</span><div style="min-width:0"><b>${it.name}</b><div class="mute" style="font-size:13px">${p.name} · ${pv}</div></div></div>
+    <dl class="space-y-2.5" style="margin-top:16px;font-size:14px" id="rows"></dl>
+    <div style="border-top:1px dashed rgba(25,31,6,.25);margin:16px 0"></div>
+    <div class="flex justify-between items-end"><span class="mute" style="font-weight:600">Total bayar</span><span class="price" style="font-size:28px" id="tot"></span></div>
+    <button class="btn btn-red hidden lg:flex" id="go" style="width:100%;margin-top:18px;min-height:54px" disabled>Bayar sekarang</button>
+  </aside>`;
+  const calc=()=>{const fee=st.pm?PAY.find(x=>x.id===st.pm).fee:0;const disc=st.promo?Math.min(Math.round(it.price*PROMO.pct/100),PROMO.max):0;return {fee,disc,total:it.price+fee-disc};};
+  const upd=()=>{const c=calc();const r=(a,b)=>`<div class="flex justify-between gap-4"><dt class="mute">${a}</dt><dd style="font-weight:700;text-align:right;word-break:break-all">${b}</dd></div>`;
+    $('rows').innerHTML=r('Tujuan',n)+r('Harga',rp(it.price))+r('Biaya metode',st.pm?(c.fee?rp(c.fee):'Gratis'):'–')+(c.disc?r('Promo PIXCLOUD5','<span class="red">−'+rp(c.disc)+'</span>'):'');
+    $('tot').textContent=$('ftot').textContent=rp(c.total);$('go').disabled=$('fgo').disabled=!st.pm;
+    $('fpm').textContent=st.pm?PAY.find(x=>x.id===st.pm).name:'Pilih metode bayar';};
+  document.querySelectorAll('.pm').forEach(b=>b.onclick=()=>{st.pm=b.dataset.id;document.querySelectorAll('.pm').forEach(x=>x.classList.toggle('on',x===b));upd();});
+  $('ap').onclick=()=>{const v=$('promo').value.trim().toUpperCase();const m=$('pmsg');
+    if(v===PROMO.code){st.promo=true;m.className='red';m.style.fontWeight='700';m.textContent='Promo dipakai: hemat '+rp(calc().disc)+'.';}
+    else{st.promo=false;m.className='mute';m.style.fontWeight='';m.textContent=v?'Kode promo nggak valid.':'Masukkan kode promo dulu.';}upd();};
+  const pay=()=>{const c=calc();const id='TPC-'+Math.random().toString(36).slice(2,6).toUpperCase();
+    saveOrder({id,date:new Date().toISOString(),slug:s,product:p.name,provider:pv,item:it.name,target:n,price:it.price,fee:c.fee,disc:c.disc,total:c.total,method:PAY.find(x=>x.id===st.pm).name,email:$('em').value.trim(),status:'Berhasil'});
+    location.href='/invoice?id='+id;};
+  $('go').onclick=$('fgo').onclick=pay; upd();
+});
+</script>
+</body>
+</html>

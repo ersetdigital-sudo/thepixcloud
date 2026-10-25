@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bantuan · thepixcloud</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/app.js"></script>
+</head>
+<body>
+<header id="hdr"></header>
+<main class="wrap" style="padding-top:36px">
+  <div style="max-width:720px">
+    <span class="badge">Pusat bantuan</span>
+    <h1 style="font-size:clamp(34px,6vw,60px);font-weight:900;line-height:1;margin-top:12px">Ada yang bisa kami bantu?</h1>
+    <div class="relative" style="margin-top:22px">
+      <svg class="ic mute" viewBox="0 0 24 24" style="position:absolute;left:16px;top:50%;transform:translateY(-50%)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" class="inp" placeholder="Cari pertanyaan, misal: refund" style="padding-left:48px;background:#fff">
+    </div>
+    <div class="hscroll" id="cats" style="margin-top:14px"></div>
+  </div>
+  <div class="grid lg:grid-cols-[1fr_340px] gap-8 items-start" style="margin-top:28px">
+    <div><div id="list" class="space-y-3"></div><p id="empty" class="mute card" style="display:none;padding:20px;text-align:center">Nggak ada hasil. Coba kata lain atau hubungi kami.</p></div>
+    <aside id="kontak" class="card card-pop" style="padding:24px;position:sticky;top:90px">
+      <h2 style="font-size:22px;font-weight:800">Masih bingung?</h2>
+      <p class="mute" style="font-size:14px;margin-top:4px">Tim kami siap bantu setiap hari, 08.00–22.00 WIB.</p>
+      <div class="space-y-2.5" style="margin-top:18px">
+        <a href="https://wa.me/6280000000000" target="_blank" rel="noopener" class="btn btn-red" style="width:100%;justify-content:flex-start"><svg class="ic" viewBox="0 0 24 24"><path d="M4 18.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7.5z"/><path d="M8 9.5h8M8 12.5h5"/></svg>WhatsApp: 0800-0000-0000</a>
+        <a href="mailto:halo@thepixcloud.id" class="btn btn-ghost" style="width:100%;justify-content:flex-start"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg>halo@thepixcloud.id</a>
+        <a href="/invoice" class="btn btn-ghost" style="width:100%;justify-content:flex-start"><svg class="ic" viewBox="0 0 24 24"><path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Cek status invoice</a>
+      </div>
+      <p class="mute" style="font-size:12px;margin-top:12px">Nomor WhatsApp &amp; email di atas masih contoh.</p>
+    </aside>
+  </div>
+</main>
+<div id="ftr"></div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const F=[
+   ['Pembayaran','Metode pembayaran apa saja yang tersedia?','QRIS, virtual account BCA, BRI, Mandiri (+Rp4.000), DANA dan OVO (gratis), serta Alfamart dan Indomaret (+Rp2.500).'],
+   ['Pembayaran','Sudah bayar tapi status belum berubah?','Konfirmasi biasanya instan. Kalau lebih dari 15 menit, kirim kode invoice dan bukti bayar ke WhatsApp kami.'],
+   ['Pembayaran','Apakah ada biaya tambahan?','Harga produk sudah termasuk admin. Biaya tambahan hanya dari metode bayar tertentu dan selalu ditampilkan sebelum bayar.'],
+   ['Pesanan','Berapa lama pesanan diproses?','Rata-rata sekitar 5 detik. Saat gangguan operator bisa beberapa menit.'],
+   ['Pesanan','Salah input nomor tujuan, bisa dibatalkan?','Transaksi yang sudah sukses tidak bisa dibatalkan. Selalu cek ulang nomor di ringkasan sebelum bayar.'],
+   ['Pesanan','Transaksi gagal, uang saya gimana?','Dana dikembalikan penuh. Untuk QRIS dan e-wallet otomatis, untuk VA dan gerai retail kami proses manual maksimal 1x24 jam.'],
+   ['Akun','Apakah harus daftar akun?','Tidak. Semua transaksi bisa tanpa akun. Simpan kode invoice untuk cek status.'],
+   ['Akun','Riwayat transaksi saya hilang?','Riwayat disimpan di browser. Kalau kamu hapus data browser atau ganti perangkat, riwayat tidak terbawa.'],
+   ['Promo','Bagaimana cara pakai kode promo?','Masukkan kode di halaman pembayaran lalu tekan Pakai. PIXCLOUD5 memberi diskon 5%, maksimal Rp5.000.'],
+   ['Promo','Bisa pakai dua promo sekaligus?','Satu transaksi hanya bisa satu kode promo.']
+  ];
+  const cats=['Semua','Pembayaran','Pesanan','Akun','Promo'];let cat='Semua';
+  const $=id=>document.getElementById(id);
+  $('cats').innerHTML=cats.map(c=>`<button class="tab ${c==='Semua'?'on':''}" data-c="${c}">${c}</button>`).join('');
+  $('list').innerHTML=F.map(([c,q,a],i)=>`<details class="faq" data-c="${c}" data-t="${(q+' '+a).toLowerCase()}"><summary><span><span class="badge" style="font-size:11px;padding:3px 9px;margin-bottom:6px">${c}</span><br>${q}</span><span class="pl">+</span></summary><p>${a}</p></details>`).join('');
+  const filt=()=>{const t=$('q').value.trim().toLowerCase();let n=0;
+    document.querySelectorAll('#list details').forEach(d=>{const ok=(cat==='Semua'||d.dataset.c===cat)&&(!t||d.dataset.t.includes(t));d.style.display=ok?'':'none';if(ok)n++;});
+    $('empty').style.display=n?'none':'block';};
+  $('q').oninput=filt;
+  document.querySelectorAll('#cats .tab').forEach(b=>b.onclick=()=>{cat=b.dataset.c;document.querySelectorAll('#cats .tab').forEach(x=>x.classList.toggle('on',x===b));filt();});
+});
+</script>
+</body>
+</html>

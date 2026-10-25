@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Produk · thepixcloud</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/assets/theme.css">
+<script src="/assets/app.js"></script>
+</head>
+<body class="no-foot-m">
+<header id="hdr"></header>
+<main class="pb-bar">
+  <section class="wrap" style="padding-top:20px">
+    <div id="banner" style="background:#191F06;color:#F0EEDA;border-radius:10px;border:2px solid #191F06;box-shadow:6px 6px 0 #E43E00;padding:26px;position:relative;overflow:hidden"></div>
+  </section>
+
+  <section class="wrap grid lg:grid-cols-[1fr_360px] gap-6 items-start" style="margin-top:24px">
+    <div class="space-y-4">
+      <div class="card" style="padding:22px" id="c1">
+        <div class="step" id="st1"><span class="n">1</span><div><h3 style="font-size:19px;font-weight:800">Isi tujuan</h3><p class="mute" style="font-size:13.5px" id="st1sub">Masukkan data tujuan.</p></div></div>
+        <label class="lbl" for="num" id="numlbl">Nomor HP</label>
+        <div class="relative"><input id="num" class="inp" autocomplete="off" style="padding-right:120px">
+          <span id="opb" class="badge" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);display:none"></span></div>
+        <p id="numhint" class="mute" style="font-size:12.5px;margin-top:8px"></p>
+      </div>
+
+      <div class="card" style="padding:22px" id="c2">
+        <div class="step" id="st2"><span class="n">2</span><div><h3 style="font-size:19px;font-weight:800">Pilih provider</h3><p class="mute" style="font-size:13.5px">Geser untuk lihat semua.</p></div></div>
+        <div class="hscroll" id="provs"></div>
+      </div>
+
+      <div class="card" style="padding:22px" id="c3">
+        <div class="step" id="st3"><span class="n" id="n3">3</span><div><h3 style="font-size:19px;font-weight:800" id="st3t">Pilih nominal</h3><p class="mute" style="font-size:13.5px" id="st3sub">Harga sudah termasuk biaya admin.</p></div></div>
+        <div id="noms" class="grid grid-cols-2 md:grid-cols-3 gap-3" style="padding-top:8px"></div>
+      </div>
+    </div>
+
+    <aside class="hidden lg:block card card-pop" style="padding:24px;position:sticky;top:90px">
+      <h3 style="font-size:20px;font-weight:800">Ringkasan</h3>
+      <dl class="space-y-3" style="margin-top:16px;font-size:14px" id="sum"></dl>
+      <div style="border-top:1px dashed rgba(25,31,6,.25);margin:18px 0"></div>
+      <div class="flex justify-between items-end"><span class="mute" style="font-weight:600">Total</span><span class="price" style="font-size:28px" id="tot">Rp0</span></div>
+      <button class="btn btn-red" id="go" style="width:100%;margin-top:18px;min-height:54px" disabled>Lanjut bayar</button>
+      <p class="mute" style="font-size:12px;margin-top:10px;text-align:center">Tanpa akun. Gagal = refund.</p>
+    </aside>
+  </section>
+</main>
+
+<div class="fbar" id="fbar">
+  <div style="flex:1;min-width:0"><div id="fst" style="font-size:12px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Isi nomor HP dulu</div><div class="fh" id="ftot" style="font-weight:800;font-size:18px">Rp0</div></div>
+  <button class="btn btn-red" id="fgo" disabled>Bayar</button>
+</div>
+<div id="ftr"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const {P,items,bill,detectOp,rp,icon,qs}=CZ;
+  let slug=qs('s'); if(!P[slug]) slug='pulsa';
+  const p=P[slug]; document.title=p.name+' · thepixcloud';
+  const st={prov:null,i:null,bill:null};
+  const $=id=>document.getElementById(id);
+
+  $('banner').innerHTML=`<div style="position:absolute;right:-30px;top:-30px;width:160px;height:160px;border-radius:40px;background:rgba(255,252,176,.14);transform:rotate(18deg)"></div>
+   <div class="flex flex-col md:flex-row md:items-center gap-5 relative">
+    <span style="width:64px;height:64px;border-radius:18px;background:#F0EEDA;color:#E43E00;display:grid;place-items:center;flex:none">${icon(p.icon,'ic" style="width:32px;height:32px')}</span>
+    <div style="flex:1"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.75">${p.cat}</div>
+     <h1 style="font-size:clamp(32px,6vw,48px);font-weight:900;line-height:1;margin-top:4px">${p.name}</h1>
+     <p style="opacity:.85;margin-top:8px;max-width:560px">${p.desc}</p>
+     <div class="flex flex-wrap gap-2" style="margin-top:14px">${['⚡ Proses ±5 detik','↺ Gagal = refund','Buka 24 jam'].map(c=>`<span style="background:rgba(240,238,218,.14);border:1px solid rgba(240,238,218,.25);padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600">${c}</span>`).join('')}</div></div></div>`;
+
+  const num=$('num'); num.placeholder=p.ph; $('numlbl').textContent=p.label;
+  num.inputMode=p.type==='text'?'text':'numeric'; if(p.type==='tel') num.type='tel';
+  $('st1sub').textContent=p.detect?'Operator terdeteksi otomatis.':'Pastikan data sudah benar.';
+  if(p.detect) $('c2').style.display='none';
+  if(p.bill){$('st3t').textContent='Tagihan kamu';$('st3sub').textContent='Muncul otomatis setelah ID diisi.';}
+  if(slug==='bpjs'){$('st3t').textContent='Pilih jumlah bulan';}
+  // renumber visually when step 2 hidden
+  if(p.detect) $('n3').textContent='2';
+
+  const digits=()=>num.value.replace(/\D/g,'');
+  const valid=()=>p.type==='text'?num.value.trim().length>=5:digits().length>=(p.detect||p.type==='tel'?10:6);
+  const list=()=>p.bill?(st.bill?[st.bill]:[]):items(slug,st.prov);
+
+  function drawProvs(){
+    $('provs').innerHTML=p.providers.map(n=>{const ini=n.replace(/[^A-Za-z0-9 ]/g,'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      return `<button class="chip ${st.prov===n?'on':''}" data-n="${n}"><span class="av">${ini}</span>${n}</button>`}).join('');
+    $('provs').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{st.prov=b.dataset.n;st.i=null;computeBill();drawProvs();drawNoms();upd();});
+  }
+  function computeBill(){st.bill=(p.bill&&st.prov&&valid())?bill(slug,st.prov,num.value):null; if(p.bill) st.i=st.bill?0:null;}
+  function drawNoms(){
+    const L=list(); const g=$('noms');
+    if(p.bill){
+      g.className='';
+      g.innerHTML=st.bill?`<div style="border:1.5px solid #E43E00;background:#FFFCE0;border-radius:18px;padding:18px;box-shadow:4px 4px 0 #FFFCB0">
+        <div class="flex justify-between gap-3"><div><div class="mute" style="font-size:12.5px">Nama pelanggan</div><div style="font-weight:800;font-size:17px">${st.bill.sub}</div></div><span class="badge">Belum dibayar</span></div>
+        <div class="grid grid-cols-2 gap-3" style="margin-top:14px;font-size:14px"><div><div class="mute" style="font-size:12.5px">Periode</div><b>${st.bill.name.replace('Tagihan ','')}</b></div><div><div class="mute" style="font-size:12.5px">Provider</div><b>${st.prov}</b></div>
+        <div><div class="mute" style="font-size:12.5px">Tagihan</div><b>${rp(st.bill.base)}</b></div><div><div class="mute" style="font-size:12.5px">Admin</div><b>${rp(st.bill.admin)}</b></div></div>
+        <div class="flex justify-between items-end" style="margin-top:14px;padding-top:12px;border-top:1px dashed rgba(25,31,6,.25)"><span class="mute">Total</span><span class="price" style="font-size:24px">${rp(st.bill.price)}</span></div>
+        <p class="mute" style="font-size:11.5px;margin-top:8px">Data simulasi.</p></div>`
+        :`<div class="mute" style="border:1.5px dashed rgba(25,31,6,.25);border-radius:16px;padding:22px;text-align:center;font-size:14px">${!st.prov?'Pilih provider dulu.':'Isi ID pelanggan untuk menampilkan tagihan.'}</div>`;
+      return;
+    }
+    g.className='grid grid-cols-2 md:grid-cols-3 gap-3';
+    if(p.detect&&!st.prov){g.innerHTML=`<div class="mute col-span-2 md:col-span-3" style="border:1.5px dashed rgba(25,31,6,.25);border-radius:16px;padding:22px;text-align:center;font-size:14px">Ketik nomor HP, nominal muncul sesuai operator.</div>`;return;}
+    if(!p.detect&&!st.prov){g.innerHTML=`<div class="mute col-span-2 md:col-span-3" style="border:1.5px dashed rgba(25,31,6,.25);border-radius:16px;padding:22px;text-align:center;font-size:14px">Pilih provider dulu.</div>`;return;}
+    g.innerHTML=L.map((it,i)=>`<button class="nom ${st.i===i?'on':''}" data-i="${i}" style="margin-top:4px">${i===2?'<span class="pop">Populer</span>':''}<span class="ck">${icon('check','ic" style="width:14px;height:14px')}</span>
+      <div style="font-weight:800;font-size:15px;padding-right:22px;line-height:1.25">${it.name}</div><div class="mute" style="font-size:12px;margin-top:2px">${it.sub}</div><div class="price" style="font-size:16px;margin-top:8px">${rp(it.price)}</div></button>`).join('');
+    g.querySelectorAll('.nom').forEach(b=>b.onclick=()=>{st.i=+b.dataset.i;drawNoms();upd();});
+  }
+  function upd(){
+    const L=list(),it=st.i!=null?L[st.i]:null,ok=valid()&&st.prov&&it;
+    $('st1').classList.toggle('done',valid()); $('st2').classList.toggle('done',!!st.prov); $('st3').classList.toggle('done',!!it);
+    const row=(a,b)=>`<div class="flex justify-between gap-4"><dt class="mute">${a}</dt><dd style="font-weight:700;text-align:right;word-break:break-word">${b||'–'}</dd></div>`;
+    $('sum').innerHTML=row('Produk',p.name)+row('Provider',st.prov)+row('Item',it&&it.name)+row('Tujuan',num.value.trim());
+    const t=it?rp(it.price):'Rp0'; $('tot').textContent=t; $('ftot').textContent=t;
+    $('go').disabled=$('fgo').disabled=!ok;
+    const lab=p.detect?'nomor HP':p.label.toLowerCase();
+    $('fst').textContent=!valid()?`Isi ${lab} dulu`:!st.prov?'Pilih provider dulu':!it?(p.bill?'Menunggu tagihan':'Pilih nominal dulu'):it.name;
+  }
+  num.oninput=()=>{
+    if(p.detect){const o=detectOp(num.value);$('opb').style.display=o?'inline-flex':'none';$('opb').textContent=o||'';
+      $('numhint').textContent=(!o&&digits().length>=4)?'Operator nggak dikenali. Cek 4 digit awal nomor kamu.':'';
+      if(o!==st.prov){st.prov=o;st.i=null;drawNoms();}}
+    if(p.bill){computeBill();drawNoms();}
+    upd();
+  };
+  const go=()=>{const it=list()[st.i];location.href=`/bayar?s=${slug}&p=${encodeURIComponent(st.prov)}&i=${st.i}&n=${encodeURIComponent(num.value.trim())}&a=${it.price}`;};
+  $('go').onclick=$('fgo').onclick=go;
+  if(!p.detect){st.prov=p.providers.length===1?p.providers[0]:null;drawProvs();}
+  const pre=qs('n'); if(pre){num.value=pre;num.oninput();}
+  drawNoms();upd();
+});
+</script>
+</body>
+</html>
