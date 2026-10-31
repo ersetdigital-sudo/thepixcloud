@@ -11,10 +11,26 @@ import {
   products,
   QRIS_IMAGE,
 } from "@/lib/catalog";
-import { createOrder, type Order } from "@/lib/store";
+import { createOrder } from "@/lib/db/client";
+import { toPublicError } from "@/lib/db/errors";
+import { rememberInvoice } from "@/lib/store";
 import { ServiceIcon } from "./ServiceIcon";
 
-export function CheckoutClient() {
+function clock(total: number) {
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(
+    total % 60,
+  ).padStart(2, "0")}`;
+}
+
+export function CheckoutClient({
+  brandSlug,
+  qrisMethodId,
+  qrisImageUrl,
+}: {
+  brandSlug: string;
+  qrisMethodId: string | null;
+  qrisImageUrl: string | null;
+}) {
   const params = useSearchParams();
   const requested = params.get("s");
   const slug = isSlug(requested) ? requested : null;
@@ -23,30 +39,86 @@ export function CheckoutClient() {
   const item = params.get("i") ?? "";
   const target = params.get("n") ?? "";
   const amount = Number(params.get("a")) || 0;
+  const serviceId = params.get("sid") ?? "";
+  const productId = params.get("pid") ?? "";
   const valid = !!product && !!provider && !!item && !!target && amount > 0;
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const saving = useRef(false);
+  const [inv, setInv] = useState("");
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [expiresAt, setExpiresAt] = useState(0);
+  const [left, setLeft] = useState(0);
+  const [timedOut, setTimedOut] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [payError, setPayError] = useState("");
+  const [paid, setPaid] = useState(false);
+  const createdRef = useRef(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  function confirmPayment() {
-    if (saving.current || !slug || !product || !valid) return;
-    saving.current = true;
-    setOrder(
-      createOrder({
-        slug,
-        product: product.name,
-        provider,
-        item,
-        target,
-        amount,
-      }),
-    );
-    window.scrollTo(0, 0);
+  async function create() {
+    if (!product || !valid) return;
+    if (!serviceId || !productId) {
+      setPayError("Data pesanan belum lengkap. Ulangi dari halaman produk.");
+      createdRef.current = false;
+      return;
+    }
+    if (!brandSlug || !qrisMethodId) {
+      setPayError("Pembayaran belum tersedia. Coba lagi sebentar.");
+      createdRef.current = false;
+      return;
+    }
+
+    setCreating(true);
+    setPayError("");
+    try {
+      const created = await createOrder({
+        brandSlug,
+        serviceId,
+        productId,
+        nomorTujuan: target.trim(),
+        input: { provider, item, nomor_tujuan: target.trim() },
+        paymentMethodId: qrisMethodId,
+      });
+      const expiry = new Date(created.expires_at).getTime();
+      setInv(created.ref);
+      setOrderTotal(created.total);
+      setExpiresAt(expiry);
+      setLeft(Math.max(1, Math.ceil((expiry - Date.now()) / 1000)));
+      setTimedOut(false);
+      rememberInvoice({
+        ref: created.ref,
+        label: item,
+        amount: created.total,
+        createdAt: Date.now(),
+      });
+    } catch (failure) {
+      setPayError(toPublicError(failure).message);
+      createdRef.current = false;
+    } finally {
+      setCreating(false);
+    }
   }
+
+  useEffect(() => {
+    if (!valid || createdRef.current) return;
+    createdRef.current = true;
+    void create();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valid]);
+
+  useEffect(() => {
+    if (!expiresAt || paid) return;
+    const tick = () => {
+      const next = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+      setLeft(next);
+      if (next <= 0) setTimedOut(true);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt, paid]);
 
   if (!product || !valid) {
     return (
@@ -73,9 +145,11 @@ export function CheckoutClient() {
     );
   }
 
+  const displayTotal = inv ? orderTotal : amount;
   const waConfirm = `${ADMIN_WHATSAPP_URL}?text=${encodeURIComponent(
-    `Halo admin thepixcloud, saya sudah bayar QRIS${order ? ` untuk invoice ${order.id}` : "."}`,
+    `Halo admin thepixcloud, saya sudah bayar QRIS${inv ? ` untuk invoice ${inv}` : "."}`,
   )}`;
+  const payDisabled = creating || !inv || timedOut;
 
   return (
     <main className="pb-bar">
@@ -93,7 +167,7 @@ export function CheckoutClient() {
 
       <section className="wrap mt-6 grid items-start gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
-          {order ? (
+          {paid ? (
             <div className="card p-[22px] md:p-7">
               <div className="flex items-start gap-4">
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[10px] bg-tomato text-paper">
@@ -114,10 +188,15 @@ export function CheckoutClient() {
 
               <div className="mt-6 rounded-[8px] border-2 border-ink bg-[#FFFCE0] p-5">
                 <p className="mono text-xs text-olive">Kode invoice</p>
-                <p className="mt-1 font-display text-2xl font-extrabold">{order.id}</p>
+                <p className="mt-1 font-display text-2xl font-extrabold">
+                  {inv || "—"}
+                </p>
+                <p className="mt-2 text-sm text-olive">
+                  Total {formatRupiah(displayTotal)}
+                </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
-                    href={`/invoice/?id=${order.id}`}
+                    href={`/invoice/?id=${inv}`}
                     className="btn btn-red"
                   >
                     Cek status
@@ -147,10 +226,43 @@ export function CheckoutClient() {
                 <span className="badge">QRIS</span>
               </div>
 
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[6px] border-2 border-ink bg-paper px-4 py-3">
+                <div>
+                  <p className="mono text-[10px] text-olive">Kode invoice</p>
+                  <p className="font-display text-lg font-extrabold">
+                    {inv || (creating ? "Menyiapkan…" : "—")}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="mono text-[10px] text-olive">Selesaikan dalam</p>
+                  <p className="font-display text-lg font-extrabold">
+                    {!inv ? "—" : timedOut ? "Waktu habis" : clock(left)}
+                  </p>
+                </div>
+              </div>
+
+              {payError ? (
+                <div className="mt-4 rounded-[6px] border-2 border-tomato bg-[#FFF5F0] p-4 text-xs text-tomato">
+                  <p className="font-bold">{payError}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!creating) {
+                        createdRef.current = true;
+                        void create();
+                      }
+                    }}
+                    className="mono mt-2 rounded border-2 border-tomato px-3 py-1.5 font-bold"
+                  >
+                    Coba lagi
+                  </button>
+                </div>
+              ) : null}
+
               <div className="mt-5 grid items-center gap-6 rounded-[8px] border-2 border-ink bg-paper p-4 sm:grid-cols-[220px_1fr] sm:p-5">
                 <div className="rounded-[6px] bg-white p-3">
                   <img
-                    src={QRIS_IMAGE}
+                    src={qrisImageUrl || QRIS_IMAGE}
                     alt="QRIS pembayaran thepixcloud"
                     width={440}
                     height={440}
@@ -159,7 +271,7 @@ export function CheckoutClient() {
                 </div>
                 <div>
                   <p className="mono text-xs text-olive">Total bayar</p>
-                  <p className="price mt-1 text-4xl">{formatRupiah(amount)}</p>
+                  <p className="price mt-1 text-4xl">{formatRupiah(displayTotal)}</p>
                   <ol className="mt-4 space-y-2 text-sm text-olive">
                     <li>1. Buka e-wallet atau m-banking.</li>
                     <li>2. Scan QRIS di samping.</li>
@@ -179,6 +291,15 @@ export function CheckoutClient() {
                   </span>
                 ))}
               </div>
+
+              <button
+                type="button"
+                onClick={() => setPaid(true)}
+                disabled={payDisabled}
+                className="btn btn-red mt-4 hidden w-full min-h-[54px] disabled:cursor-not-allowed disabled:opacity-50 lg:flex"
+              >
+                {creating ? "Menyiapkan…" : "Saya sudah bayar"}
+              </button>
 
               <p className="mt-4 rounded-[6px] border border-dashed border-ink/25 p-4 text-xs text-olive">
                 Bayar sesuai nominal agar mudah diverifikasi. Kalau status belum
@@ -241,24 +362,28 @@ export function CheckoutClient() {
           <div className="my-4 border-t border-dashed border-ink/25" />
           <div className="flex items-end justify-between">
             <span className="font-semibold text-olive">Total bayar</span>
-            <span className="price text-[28px]">{formatRupiah(amount)}</span>
+            <span className="price text-[28px]">{formatRupiah(displayTotal)}</span>
           </div>
 
-          {order ? (
+          {paid || inv ? (
             <div className="mt-4 rounded-[6px] border-2 border-ink bg-[#FFFCE0] p-4">
               <p className="mono text-xs text-olive">Status</p>
               <p className="mt-1 inline-flex items-center gap-2 font-bold">
                 <span className="dot-live" />
-                Sedang diproses
+                {paid ? "Sedang diproses" : "Menunggu pembayaran"}
               </p>
+              {inv ? (
+                <p className="mono mt-1 text-[10px] text-olive">Invoice {inv}</p>
+              ) : null}
             </div>
           ) : (
             <button
               type="button"
-              onClick={confirmPayment}
-              className="btn btn-red mt-[18px] hidden w-full min-h-[54px] lg:flex"
+              onClick={() => setPaid(true)}
+              disabled={payDisabled}
+              className="btn btn-red mt-[18px] hidden w-full min-h-[54px] disabled:cursor-not-allowed disabled:opacity-50 lg:flex"
             >
-              Saya sudah bayar
+              {creating ? "Menyiapkan…" : "Saya sudah bayar"}
             </button>
           )}
 
@@ -268,20 +393,21 @@ export function CheckoutClient() {
         </aside>
       </section>
 
-      {order ? null : (
+      {paid ? null : (
         <div className="fbar lg:hidden">
           <div className="min-w-0 flex-1">
             <div className="text-xs opacity-70">Total bayar</div>
             <div className="font-display text-lg font-extrabold">
-              {formatRupiah(amount)}
+              {formatRupiah(displayTotal)}
             </div>
           </div>
           <button
             type="button"
-            onClick={confirmPayment}
-            className="btn border-ink bg-ink text-paper shadow-none"
+            onClick={() => setPaid(true)}
+            disabled={payDisabled}
+            className="btn border-ink bg-ink text-paper shadow-none disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Saya sudah bayar
+            {creating ? "Menyiapkan…" : "Saya sudah bayar"}
           </button>
         </div>
       )}

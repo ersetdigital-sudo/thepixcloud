@@ -36,13 +36,7 @@ export type Item = {
   name: string;
   sub: string;
   price: number;
-};
-
-export type BillItem = Item & {
-  customer: string;
-  period: string;
-  base: number;
-  admin: number;
+  id?: string;
 };
 
 export const groupLabels: Record<Group, string> = {
@@ -343,35 +337,4 @@ export function itemsFor(slug: Slug, provider: string | null): Item[] {
     default:
       return [];
   }
-}
-
-export function billFor(slug: Slug, provider: string, target: string): BillItem | null {
-  const ranges: Partial<Record<Slug, [number, number]>> = {
-    pdam: [45000, 260000],
-    "tv-internet": [185000, 520000],
-    multifinance: [650000, 2400000],
-  };
-  const range = ranges[slug];
-  if (!range) return null;
-
-  const digits = target.replace(/\D/g, "");
-  let hash = 0;
-  for (const char of digits + provider) {
-    hash = (hash * 31 + char.charCodeAt(0)) % 99991;
-  }
-  const [min, max] = range;
-  const base = Math.round((min + ((hash % 1000) / 1000) * (max - min)) / 100) * 100;
-  const names = ["Budi Santoso", "Siti Rahma", "Andi Wijaya", "Dewi Lestari", "Rizky Pratama", "Nur Aini"];
-  const months = ["Oktober 2026", "Oktober 2026", "September 2026"];
-  const admin = 2500;
-
-  return {
-    name: `Tagihan ${months[hash % months.length]}`,
-    sub: names[hash % names.length],
-    customer: names[hash % names.length],
-    period: months[hash % months.length],
-    base,
-    admin,
-    price: base + admin,
-  };
 }

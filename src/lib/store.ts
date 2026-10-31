@@ -1,60 +1,52 @@
-import type { Slug } from "./catalog";
-
-export type OrderStatus = "processing";
-
-export type Order = {
-  id: string;
-  slug: Slug;
-  product: string;
-  provider: string;
-  item: string;
-  target: string;
+export type RecentInvoice = {
+  ref: string;
+  label: string;
   amount: number;
-  method: "QRIS";
-  status: OrderStatus;
   createdAt: number;
 };
 
-const STORAGE_KEY = "thepixcloud_orders";
+const STORAGE_KEY = "thepixcloud_invoices";
 
-function readOrders(): Record<string, Order> {
-  if (typeof window === "undefined") return {};
+export function rememberInvoice(entry: RecentInvoice) {
+  if (typeof window === "undefined") return;
+  const ref = entry.ref.trim().toUpperCase();
+  if (!ref) return;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, Order>;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    const list = read();
+    const next = [
+      { ...entry, ref },
+      ...list.filter((item) => item.ref !== ref),
+    ].slice(0, 5);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    return {};
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...entry, ref }]));
   }
 }
 
-function writeOrders(orders: Record<string, Order>) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+export function getRecentInvoices(): RecentInvoice[] {
+  if (typeof window === "undefined") return [];
+  return read();
 }
 
-export function getOrders(): Order[] {
-  return Object.values(readOrders()).sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function findOrder(query: string): Order | null {
-  const code = query.trim().toUpperCase();
-  if (!code) return null;
-  return readOrders()[code] ?? null;
-}
-
-export function createOrder(
-  input: Omit<Order, "id" | "status" | "method" | "createdAt">,
-): Order {
-  const order: Order = {
-    ...input,
-    id: `TPC-${Date.now().toString(36).toUpperCase().slice(-6)}`,
-    method: "QRIS",
-    status: "processing",
-    createdAt: Date.now(),
-  };
-  const orders = readOrders();
-  orders[order.id] = order;
-  writeOrders(orders);
-  return order;
+function read(): RecentInvoice[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as Record<string, unknown>;
+      if (typeof row.ref !== "string") return [];
+      return [
+        {
+          ref: row.ref,
+          label: typeof row.label === "string" ? row.label : "-",
+          amount: Number(row.amount) || 0,
+          createdAt: Number(row.createdAt) || Date.now(),
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
 }

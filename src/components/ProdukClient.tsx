@@ -1,20 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  billFor,
   detectOperator,
   formatRupiah,
-  isSlug,
-  itemsFor,
   normalizePhone,
-  products,
-  type BillItem,
   type Item,
-  type Slug,
 } from "@/lib/catalog";
+import type { HydratedService } from "@/lib/catalog-hydrate";
 import { CheckIcon, ServiceIcon } from "./ServiceIcon";
 
 function ChipIcon({ type }: { type: "bolt" | "refund" | "clock" }) {
@@ -41,13 +36,10 @@ function ChipIcon({ type }: { type: "bolt" | "refund" | "clock" }) {
   );
 }
 
-export function ProdukClient() {
+export function ProdukClient({ service }: { service: HydratedService }) {
   const router = useRouter();
-  const params = useSearchParams();
-  const requested = params.get("s");
-  const slug: Slug = isSlug(requested) ? requested : "pulsa";
-  const product = products[slug];
-  const query = params.toString();
+  const product = service.product;
+  const slug = product.slug;
 
   const [target, setTarget] = useState("");
   const [provider, setProvider] = useState<string | null>(
@@ -60,14 +52,8 @@ export function ProdukClient() {
   const [selected, setSelected] = useState<number | null>(null);
 
   useEffect(() => {
-    const next = products[slug];
-    setTarget("");
-    setProvider(
-      next.detect ? null : next.providers.length === 1 ? next.providers[0] : null,
-    );
-    setSelected(null);
-    document.title = `${next.name} · thepixcloud`;
-  }, [slug, query]);
+    document.title = `${product.name} · thepixcloud`;
+  }, [product.name]);
 
   const digits = target.replace(/\D/g, "");
   const valid =
@@ -77,10 +63,10 @@ export function ProdukClient() {
         ? normalizePhone(target).length >= 10
         : digits.length >= 6;
 
-  const billItem: BillItem | null =
-    product.bill && provider && valid ? billFor(slug, provider, target) : null;
-  const list = product.bill ? [] : itemsFor(slug, provider);
-  const item: Item | BillItem | null = product.bill
+  const billItem: Item | null =
+    product.bill && provider && valid ? service.billItem : null;
+  const list = product.bill ? [] : service.byProvider[provider ?? ""] ?? [];
+  const item: Item | null = product.bill
     ? billItem
     : selected !== null
       ? list[selected] ?? null
@@ -114,6 +100,8 @@ export function ProdukClient() {
       i: item.name,
       n: target.trim(),
       a: String(item.price),
+      sid: service.dbServiceId ?? "",
+      pid: item.id ?? "",
     });
     router.push(`/bayar/?${next.toString()}`);
   }
@@ -281,7 +269,7 @@ export function ProdukClient() {
                 </h3>
                 <p className="text-[13.5px] text-olive">
                   {product.bill
-                    ? "Muncul otomatis setelah ID diisi."
+                    ? "Nominal tagihan dari katalog, dicek admin."
                     : "Harga sudah termasuk biaya admin."}
                 </p>
               </div>
@@ -292,34 +280,28 @@ export function ProdukClient() {
                 <div className="mt-2 rounded-[18px] border-2 border-tomato bg-[#FFFCE0] p-[18px] shadow-[4px_4px_0_#FFFCB0]">
                   <div className="flex justify-between gap-3">
                     <div>
-                      <div className="text-[12.5px] text-olive">Nama pelanggan</div>
-                      <div className="text-[17px] font-extrabold">{billItem.customer}</div>
+                      <div className="text-[12.5px] text-olive">Nominal tagihan</div>
+                      <div className="text-[17px] font-extrabold">{billItem.name}</div>
                     </div>
                     <span className="badge">Belum dibayar</span>
                   </div>
                   <div className="mt-3.5 grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <div className="text-[12.5px] text-olive">Periode</div>
-                      <b>{billItem.period}</b>
-                    </div>
-                    <div>
                       <div className="text-[12.5px] text-olive">Provider</div>
                       <b>{provider}</b>
                     </div>
                     <div>
-                      <div className="text-[12.5px] text-olive">Tagihan</div>
-                      <b>{formatRupiah(billItem.base)}</b>
-                    </div>
-                    <div>
-                      <div className="text-[12.5px] text-olive">Admin</div>
-                      <b>{formatRupiah(billItem.admin)}</b>
+                      <div className="text-[12.5px] text-olive">Tujuan</div>
+                      <b className="break-all">{target.trim()}</b>
                     </div>
                   </div>
                   <div className="mt-3.5 flex items-end justify-between border-t border-dashed border-ink/25 pt-3">
                     <span className="text-olive">Total</span>
                     <span className="price text-2xl">{formatRupiah(billItem.price)}</span>
                   </div>
-                  <p className="mt-2 text-[11.5px] text-olive">Data simulasi.</p>
+                  <p className="mt-2 text-[11.5px] text-olive">
+                    Nominal dari katalog. Dicek admin sebelum diproses.
+                  </p>
                 </div>
               ) : (
                 <p className="mt-1 rounded-2xl border-2 border-dashed border-ink/25 p-5 text-center text-sm text-olive">
